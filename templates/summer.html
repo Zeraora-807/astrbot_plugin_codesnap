@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            background: linear-gradient(145deg, #f9d56e 0%, #5371a8 100%);
+            font-family: 'Consolas', 'Fira Code', monospace;
+            padding: 20px;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .code-container {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(3px);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 25px 40px rgba(0, 20, 30, 0.5);
+            max-width: 800px;
+            border: 2px solid #f9d56e;
+        }
+        .window-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .window-control {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .close { background: #ff5f56; }
+        .minimize { background: #ffbd2e; }
+        .maximize { background: #27c93f; }
+        .filename {
+            color: #1e3c72;
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            text-align: right;
+            text-transform: lowercase;
+            border-bottom: 2px dashed #f9d56e;
+            padding-bottom: 4px;
+        }
+        {{ style_defs | safe }}
+        pre {
+            margin: 0;
+            padding: 0;
+            font-family: 'Consolas', 'Fira Code', monospace !important;
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--text-color);  /* 使用 CSS 变量 */
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* 其他高亮颜色可以保留，它们不依赖于背景 */
+        .hll { background-color: #ffffcc }
+        .c { color: #3d7b9a; font-style: italic }
+        .k { color: #b45f06; font-weight: bold }
+        .o { color: #1e3c72 }
+        .s { color: #2e7d32 }
+        .n { color: #1a237e }
+        .nb { color: #0b4f6c }
+        .bp { color: #0b4f6c }
+        .mi { color: #b45f06 }
+    </style>
+</head>
+<body>
+    <div class="code-container">
+        <div class="window-controls">
+            <div class="window-control close"></div>
+            <div class="window-control minimize"></div>
+            <div class="window-control maximize"></div>
+        </div>
+        <div class="filename">{{ filename }}</div>
+        <pre>{{ highlighted_code | safe }}</pre>
+    </div>
+</body>
+</html>

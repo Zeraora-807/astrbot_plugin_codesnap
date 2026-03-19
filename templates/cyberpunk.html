@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        /* 所有样式内联，无外部依赖 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #0a0c0f;
+            background-image: 
+                linear-gradient(rgba(0, 255, 255, 0.08) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 0, 255, 0.08) 1px, transparent 1px);
+            background-size: 30px 30px;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+            padding: 24px;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        /* 主容器 - 毛玻璃效果 */
+        .code-container {
+            background: rgba(10, 15, 20, 0.92);
+            backdrop-filter: blur(8px);
+            border: 2px solid #00ffff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 
+                0 0 30px rgba(0, 255, 255, 0.3),
+                inset 0 0 20px rgba(255, 0, 255, 0.2);
+            max-width: 900px;
+            width: 100%;
+            position: relative;
+        }
+        
+        /* 霓虹灯边框动画 */
+        .code-container::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            border: 2px solid transparent;
+            border-radius: 12px;
+            background: linear-gradient(45deg, #ff00ff, #00ffff, #ff00ff) border-box;
+            -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            opacity: 0.5;
+            animation: borderPulse 3s ease infinite;
+        }
+        
+        @keyframes borderPulse {
+            0%, 100% { opacity: 0.5; filter: hue-rotate(0deg); }
+            50% { opacity: 0.8; filter: hue-rotate(90deg); }
+        }
+        
+        /* 窗口控制按钮 - 霓虹风格 */
+        .window-controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .window-control {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            position: relative;
+        }
+        
+        .close { 
+            background: #ff0055;
+            box-shadow: 0 0 10px #ff0055;
+        }
+        .minimize { 
+            background: #ffff00;
+            box-shadow: 0 0 10px #ffff00;
+        }
+        .maximize { 
+            background: #00ffff;
+            box-shadow: 0 0 10px #00ffff;
+        }
+        
+        /* 控制按钮悬停效果 */
+        .window-control:hover {
+            transform: scale(1.2);
+            transition: transform 0.2s;
+        }
+        
+        /* 文件名 - 终端风格 */
+        .filename {
+            color: #00ffff;
+            font-size: 15px;
+            font-weight: 500;
+            margin-bottom: 16px;
+            padding: 6px 16px;
+            background: rgba(0, 255, 255, 0.08);
+            border-left: 4px solid #ff00ff;
+            text-align: right;
+            text-transform: lowercase;
+            letter-spacing: 1px;
+            font-family: inherit;
+            word-break: break-all;
+            box-shadow: inset 0 0 15px rgba(0, 255, 255, 0.1);
+            position: relative;
+        }
+        
+        /* 文件名前的提示符 */
+        .filename::before {
+            content: '$>';
+            position: absolute;
+            left: 12px;
+            color: #ff00ff;
+            font-weight: bold;
+            text-shadow: 0 0 8px #ff00ff;
+        }
+        
+        /* 代码区域 */
+        pre {
+            margin: 0;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace !important;
+            font-size: 15px;
+            line-height: 1.7;
+            color: var(--text-color, #e0e0e0);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-x: auto;
+            overflow-y: hidden;
+            text-shadow: 0 0 2px rgba(0, 255, 255, 0.3);
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);
+        }
+        
+        /* 自定义滚动条 - 保持霓虹风格 */
+        pre::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        pre::-webkit-scrollbar-track {
+            background: rgba(0, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+        
+        pre::-webkit-scrollbar-thumb {
+            background: #00ffff;
+            border-radius: 4px;
+            box-shadow: 0 0 10px #00ffff;
+        }
+        
+        pre::-webkit-scrollbar-thumb:hover {
+            background: #ff00ff;
+            box-shadow: 0 0 15px #ff00ff;
+        }
+        
+        /* ===== Pygments 高亮样式 ===== */
+        /* 这些样式会与注入的 style_defs 协同工作 */
+        
+        /* 基础高亮类 - 赛博朋克配色 */
+        .highlight .c, .highlight .c1, .highlight .cm { color: #888888; font-style: italic; }  /* 注释 */
+        .highlight .k, .highlight .kd, .highlight .kn { color: #ff44ff; font-weight: bold; }  /* 关键字 */
+        .highlight .kc, .highlight .kp { color: #ff88ff; }  /* 常量 */
+        .highlight .kt { color: #ff66cc; }  /* 类型 */
+        
+        .highlight .s, .highlight .s1, .highlight .s2 { color: #ffff00; }  /* 字符串 */
+        .highlight .sd { color: #aaaaaa; }  /* 文档字符串 */
+        .highlight .se { color: #ffaa00; }  /* 转义 */
+        .highlight .sr { color: #aaff00; }  /* 正则 */
+        
+        .highlight .m, .highlight .mi, .highlight .mf { color: #ffaa33; }  /* 数字 */
+        .highlight .nb, .highlight .bp { color: #33ccff; }  /* 内置函数/变量 */
+        .highlight .nc, .highlight .nd { color: #66ffcc; }  /* 类名/装饰器 */
+        .highlight .nf, .highlight .fm { color: #00ccff; }  /* 函数名 */
+        .highlight .na { color: #88ddff; }  /* 属性 */
+        .highlight .nv { color: #ffffff; }  /* 变量 */
+        
+        .highlight .o, .highlight .p { color: #ff66aa; }  /* 操作符/标点 */
+        .highlight .ow { color: #ff88cc; font-weight: bold; }  /* 关键字操作符 */
+        
+        .highlight .err { color: #ff0000; text-decoration: underline; }  /* 错误 */
+        .highlight .hll { background-color: rgba(255, 0, 255, 0.2); }  /* 高亮行 */
+        
+        /* 注入的样式定义占位符 - 用于CSS变量 */
+        {{ style_defs | safe }}
+        
+        /* 响应式设计 */
+        @media (max-width: 600px) {
+            body {
+                padding: 12px;
+            }
+            .code-container {
+                padding: 16px;
+            }
+            pre {
+                padding: 16px;
+                font-size: 14px;
+            }
+            .filename {
+                font-size: 14px;
+                padding: 4px 12px;
+            }
+        }
+        
+        /* 打印支持 */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .code-container {
+                box-shadow: none;
+                border: 1px solid #ccc;
+            }
+            pre {
+                text-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="code-container">
+        <!-- 窗口控制按钮 -->
+        <div class="window-controls">
+            <div class="window-control close" title="关闭"></div>
+            <div class="window-control minimize" title="最小化"></div>
+            <div class="window-control maximize" title="最大化"></div>
+        </div>
+        
+        <!-- 文件名（由插件动态注入） -->
+        <div class="filename">{{ filename }}</div>
+        
+        <!-- 高亮后的代码（由插件动态注入，注意 | safe 防止转义） -->
+        <pre>{{ highlighted_code | safe }}</pre>
+    </div>
+</body>
+</html>
