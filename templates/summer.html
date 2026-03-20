@@ -33,9 +33,15 @@
             border-radius: 50%;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
-        .close { background: #ff5f56; }
-        .minimize { background: #ffbd2e; }
-        .maximize { background: #27c93f; }
+        .close {
+            background: #ff5f56;
+        }
+        .minimize {
+            background: #ffbd2e;
+        }
+        .maximize {
+            background: #27c93f;
+        }
         .filename {
             color: #1e3c72;
             font-size: 15px;
@@ -53,22 +59,41 @@
             font-family: 'Consolas', 'Fira Code', monospace !important;
             font-size: 15px;
             line-height: 1.6;
-            color: var(--text-color);  /* 使用 CSS 变量 */
+            color: var(--text-color, #111111);
             white-space: pre-wrap;
             word-wrap: break-word;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
-        /* 其他高亮颜色可以保留，它们不依赖于背景 */
-        .hll { background-color: #ffffcc }
-        .c { color: #3d7b9a; font-style: italic }
-        .k { color: #b45f06; font-weight: bold }
-        .o { color: #1e3c72 }
-        .s { color: #2e7d32 }
-        .n { color: #1a237e }
-        .nb { color: #0b4f6c }
-        .bp { color: #0b4f6c }
-        .mi { color: #b45f06 }
+        .hll {
+            background-color: #ffffcc;
+        }
+        .c {
+            color: #3d7b9a;
+            font-style: italic;
+        }
+        .k {
+            color: #b45f06;
+            font-weight: bold;
+        }
+        .o {
+            color: #1e3c72;
+        }
+        .s {
+            color: #2e7d32;
+        }
+        .n {
+            color: #1a237e;
+        }
+        .nb {
+            color: #0b4f6c;
+        }
+        .bp {
+            color: #0b4f6c;
+        }
+        .mi {
+            color: #b45f06;
+        }
     </style>
 </head>
 <body>
