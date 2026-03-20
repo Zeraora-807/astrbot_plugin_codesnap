@@ -160,20 +160,14 @@ class CodeSnapPlugin(Star):
         logger.info("Playwright 资源已释放")
 
     async def _render_with_playwright(self, html: str, scale_factor: int = 2) -> str:
-        """
-        使用 Playwright 渲染 HTML 并截图，返回临时图片路径
-        """
         browser = await self._get_browser()
-        page = await browser.new_page()
+        context = await browser.new_context(
+            viewport={"width": 1200, "height": 1},
+            device_scale_factor=scale_factor
+        )
+        page = await context.new_page()
         try:
-            # 初始视口（高度临时设为 1，随后调整）
-            await page.set_viewport_size({
-                "width": 1200,
-                "height": 1,
-                "device_scale_factor": scale_factor
-            })
             await page.set_content(html, wait_until="networkidle")
-
             # 获取实际内容高度
             dimensions = await page.evaluate('''() => {
                 const body = document.body;
@@ -184,18 +178,14 @@ class CodeSnapPlugin(Star):
                 );
                 return { height };
             }''')
-            await page.set_viewport_size({
-                "width": 1200,
-                "height": dimensions['height'],
-                "device_scale_factor": scale_factor
-            })
-
-            # 截图到临时文件
+            # 只调整高度，不调缩放因子
+            await page.set_viewport_size({"width": 1200, "height": dimensions['height']})
             with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
                 await page.screenshot(path=tmp.name, full_page=True)
                 return tmp.name
         finally:
             await page.close()
+            await context.close()
 
     @filter.command_group("snap")
     def snap(self, event: AstrMessageEvent):
