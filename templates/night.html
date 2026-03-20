@@ -17,7 +17,6 @@
             position: relative;
         }
         
-        /* 月亮 */
         body::before {
             content: '';
             position: absolute;
@@ -43,7 +42,6 @@
             border-left: 4px solid #ffb347;
         }
         
-        /* 暖光台灯效果 */
         .code-container::after {
             content: '';
             position: absolute;
@@ -68,9 +66,15 @@
             border-radius: 50%;
         }
         
-        .close { background: #ff6b6b; }
-        .minimize { background: #feca57; }
-        .maximize { background: #48dbfb; }
+        .close {
+            background: #ff6b6b;
+        }
+        .minimize {
+            background: #feca57;
+        }
+        .maximize {
+            background: #48dbfb;
+        }
         
         .filename {
             color: #ffb347;
@@ -107,15 +111,34 @@
             box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.6);
         }
         
-        /* 深夜代码配色 - 温暖护眼 */
-        .highlight .c { color: #8b8b8b; font-style: italic; }
-        .highlight .k { color: #ffb347; font-weight: bold; }
-        .highlight .s { color: #add8e6; }
-        .highlight .mi { color: #ffa07a; }
-        .highlight .nf { color: #98fb98; }
-        .highlight .nc { color: #ffdab9; }
+        .highlight .c {
+            color: #8b8b8b;
+            font-style: italic;
+        }
+        .highlight .k {
+            color: #ffb347;
+            font-weight: bold;
+        }
+        .highlight .s {
+            color: #add8e6;
+        }
+        .highlight .mi {
+            color: #ffa07a;
+        }
+        .highlight .nf {
+            color: #98fb98;
+        }
+        .highlight .nc {
+            color: #ffdab9;
+        }
         
         {{ style_defs | safe }}
+        
+        .clearfix::after {
+            content: "";
+            clear: both;
+            display: table;
+        }
     </style>
 </head>
 <body>
