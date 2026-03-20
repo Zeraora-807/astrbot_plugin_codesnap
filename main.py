@@ -1,7 +1,6 @@
 import asyncio
 import tempfile
 import html
-import re
 import shutil
 from pathlib import Path
 from astrbot.api.event import filter, AstrMessageEvent
