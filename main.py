@@ -222,6 +222,7 @@ class CodeSnapPlugin(Star):
             device_scale_factor=scale_factor
         )
         page = await context.new_page()
+        tmp_path = None
         try:
             await page.set_content(html, wait_until="networkidle")
             dimensions = await page.evaluate('''() => {
@@ -234,13 +235,20 @@ class CodeSnapPlugin(Star):
                 return { height };
             }''')
             await page.set_viewport_size({"width": 1200, "height": dimensions['height']})
+            # 创建临时文件（不自动删除）
             with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-                await page.screenshot(path=tmp.name, full_page=True)
-                return tmp.name
+                tmp_path = tmp.name
+            await page.screenshot(path=tmp_path, full_page=True)
+            return tmp_path
+        except Exception as e:
+            # 出现异常时删除临时文件（如果已创建）
+            if tmp_path and Path(tmp_path).exists():
+                Path(tmp_path).unlink(missing_ok=True)
+            raise
         finally:
             await page.close()
             await context.close()
-
+            
     @filter.command_group("snap")
     def snap(self, event: AstrMessageEvent):
         pass
