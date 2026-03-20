@@ -1,6 +1,7 @@
 import asyncio
 import tempfile
 import html
+import re
 import shutil
 from pathlib import Path
 from astrbot.api.event import filter, AstrMessageEvent
@@ -178,7 +179,7 @@ class CodeSnapPlugin(Star):
         except Exception as e:
             logger.warning(f"高亮失败，使用纯文本: {e}")
             safe_code = html.escape(code)
-            return f'<pre>{safe_code}</pre>', f":root {{ --text-color: {base_color}; }}", html.escape(filename)
+            return safe_code, f":root {{ --text-color: {base_color}; }}", html.escape(filename)
 
     async def _get_browser(self) -> Browser:
         """懒加载浏览器实例"""
