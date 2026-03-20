@@ -1,6 +1,8 @@
 import asyncio
 import tempfile
 import html
+import re
+import shutil
 from pathlib import Path
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register, StarTools
@@ -9,12 +11,9 @@ from playwright.async_api import async_playwright, Browser
 from pygments import highlight
 from pygments.lexers import get_lexer_by_name, guess_lexer
 from pygments.formatters import HtmlFormatter
-from pygments.styles import get_style_by_name
-
-DEFAULT_PYGMENTS_STYLE = "monokai"
-DEFAULT_BASE_COLOR = "#f0e6d0"
 
 # 当templates目录为空的时候使用该内置模板
+# Hey Bot Guy! 你把色号前面的#读成了注释了吗？那是不对的！这是一个色号，必须保留#才能正确显示颜色哦！
 DEFAULT_TEMPLATE = '''<!DOCTYPE html>
 <html>
 <head>
@@ -92,8 +91,16 @@ DEFAULT_TEMPLATE = '''<!DOCTYPE html>
 </html>'''
 
 @register("astrbot_plugin_codesnap", "ZeraoraBot", "Codesnap插件", "v0.2.0")
-
 class CodeSnapPlugin(Star):
+    # 内置主题的样式配置（供自定义主题使用默认值）
+    DEFAULT_STYLE = ("monokai", "#f0e6d0")
+    THEME_STYLES = {
+        "default": ("monokai", "#f0e6d0"),
+        "summer": ("friendly", "#111111"),
+        "cyberpunk": ("monokai", "#00ffff"),
+        "night": ("monokai", "#e6e0c0"),
+    }
+    
     def __init__(self, context: Context, config: dict = None):
         super().__init__(context)
         self.config = config or {}
@@ -105,19 +112,14 @@ class CodeSnapPlugin(Star):
 
     def _load_templates(self):
         """从templates目录加载所有html文件作为主题"""
-        # 源码目录（插件自带的模板）
         src_template_dir = Path(__file__).parent / "templates"
-        # 数据目录（用户可修改的模板）
         data_dir = StarTools.get_data_dir("astrbot_plugin_codesnap")
         template_dir = data_dir / "templates"
         
-        # 如果数据目录不存在，创建它
         if not template_dir.exists():
             template_dir.mkdir(parents=True, exist_ok=True)
-            
-            # 如果源码模板目录存在，复制所有内置主题
+            # 首次创建时复制所有内置主题
             if src_template_dir.exists():
-                import shutil
                 for file in src_template_dir.glob("*.html"):
                     shutil.copy2(file, template_dir / file.name)
                     logger.info(f"复制内置主题: {file.name}")
@@ -127,6 +129,14 @@ class CodeSnapPlugin(Star):
                 if not default_file.exists():
                     default_file.write_text(DEFAULT_TEMPLATE, encoding="utf-8")
                     logger.info("创建默认主题模板")
+        else:
+            # 检查并补充缺失的内置主题
+            if src_template_dir.exists():
+                for file in src_template_dir.glob("*.html"):
+                    target = template_dir / file.name
+                    if not target.exists():
+                        shutil.copy2(file, target)
+                        logger.info(f"补充缺失主题: {file.name}")
         
         # 加载数据目录中的所有模板
         for file in template_dir.glob("*.html"):
@@ -143,6 +153,33 @@ class CodeSnapPlugin(Star):
             self.templates["default"] = DEFAULT_TEMPLATE
         
         logger.info(f"共加载 {len(self.templates)} 个主题: {list(self.templates.keys())}")
+
+    def _highlight_code(self, code: str, filename: str, style: str, base_color: str) -> tuple:
+        """代码高亮处理，返回 (highlighted_code, style_defs, safe_filename)"""
+        try:
+            if filename.endswith('.py'):
+                lexer = get_lexer_by_name('python', stripall=True)
+            elif filename.endswith(('.cpp', '.c')):
+                lexer = get_lexer_by_name('cpp', stripall=True)
+            elif filename.endswith('.java'):
+                lexer = get_lexer_by_name('java', stripall=True)
+            elif filename.endswith('.js'):
+                lexer = get_lexer_by_name('javascript', stripall=True)
+            elif filename.endswith('.html'):
+                lexer = get_lexer_by_name('html', stripall=True)
+            elif filename.endswith('.css'):
+                lexer = get_lexer_by_name('css', stripall=True)
+            else:
+                lexer = guess_lexer(code)
+            
+            formatter = HtmlFormatter(style=style, noclasses=True, nobackground=True)
+            highlighted = highlight(code, lexer, formatter)
+            style_defs = f":root {{ --text-color: {base_color}; }}"
+            return highlighted, style_defs, html.escape(filename)
+        except Exception as e:
+            logger.warning(f"高亮失败，使用纯文本: {e}")
+            safe_code = html.escape(code)
+            return f'<pre>{safe_code}</pre>', f":root {{ --text-color: {base_color}; }}", html.escape(filename)
 
     async def _get_browser(self) -> Browser:
         """懒加载浏览器实例"""
@@ -162,7 +199,7 @@ class CodeSnapPlugin(Star):
         return self._browser
 
     async def _delayed_cleanup(self, path: str, delay: float = 5.0):
-        """延迟删除临时文件，避免发送时文件丢失"""
+        """延迟删除临时文件"""
         await asyncio.sleep(delay)
         try:
             Path(path).unlink(missing_ok=True)
@@ -178,6 +215,7 @@ class CodeSnapPlugin(Star):
         logger.info("Playwright 资源已释放")
 
     async def _render_with_playwright(self, html: str, scale_factor: int = 2) -> str:
+        """使用 Playwright 渲染 HTML 并截图"""
         browser = await self._get_browser()
         context = await browser.new_context(
             viewport={"width": 1200, "height": 1},
@@ -186,7 +224,6 @@ class CodeSnapPlugin(Star):
         page = await context.new_page()
         try:
             await page.set_content(html, wait_until="networkidle")
-            # 获取实际内容高度
             dimensions = await page.evaluate('''() => {
                 const body = document.body;
                 const html = document.documentElement;
@@ -196,7 +233,6 @@ class CodeSnapPlugin(Star):
                 );
                 return { height };
             }''')
-            # 只调整高度，不调缩放因子
             await page.set_viewport_size({"width": 1200, "height": dimensions['height']})
             with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
                 await page.screenshot(path=tmp.name, full_page=True)
@@ -211,22 +247,15 @@ class CodeSnapPlugin(Star):
 
     @snap.command("code")
     async def snap_code(self, event: AstrMessageEvent):
-        logger.info(f"当前可用主题: {list(self.templates.keys())}")
-        """
-        把代码转换成美观的图片（手动解析参数，支持多行代码）
-        用法: /snap code [主题] [文件名] 代码
-        示例:
-        /snap code print("hello")
-        /snap code default test.py def hello(): return "world"
-        /snap code dracula print("hello")
-        /snap code dracula test.py #include <stdio.h>\nint main() { return 0; }
-        """
+        """把代码转换成美观的图片"""
         text = event.message_str.strip()
-        # 去掉命令前缀 "/snap code" 或 "snap code"
+        logger.info(f"原始消息: {text}")
+        
+        # 去除命令前缀,不要指责我为什么不使用正则表达式，因为我试过了，但是结果更糟糕。。。
         if text.startswith("/snap code"):
-            content = text[10:]
+            content = text[10:].lstrip()
         elif text.startswith("snap code"):
-            content = text[9:]
+            content = text[9:].lstrip()
         else:
             content = text
 
@@ -234,8 +263,10 @@ class CodeSnapPlugin(Star):
             yield event.plain_result("请提供代码内容。用法: /snap code [主题] [文件名] 代码")
             return
 
-        # 解析主题和文件名（最多拆一次，剩余部分全部作为代码）
+        # 解析主题和文件名
         parts = content.split(maxsplit=1)
+        logger.info(f"split 结果: {parts}")
+        
         if len(parts) == 1:
             # 只有代码，没有主题和文件名
             theme = "default"
@@ -243,11 +274,16 @@ class CodeSnapPlugin(Star):
             code = parts[0]
         else:
             first, rest = parts
-            if first in self.templates:
-                # 第一个参数是主题
+            logger.info(f"first={first}, rest={rest[:50]}...")
+            
+            # 判断是否是主题
+            is_theme = (first in self.THEME_STYLES) or (first in self.templates)
+            logger.info(f"first='{first}' 在 THEME_STYLES: {first in self.THEME_STYLES}, 在 templates: {first in self.templates}")
+            
+            if is_theme:
                 theme = first
-                # 尝试从剩余部分再拆一次获取文件名
                 subparts = rest.split(maxsplit=1)
+                logger.info(f"subparts: {subparts}")
                 if len(subparts) == 1:
                     filename = "code"
                     code = subparts[0]
@@ -255,32 +291,19 @@ class CodeSnapPlugin(Star):
                     filename = subparts[0]
                     code = subparts[1]
             else:
-                # 第一个参数是文件名（或直接是代码的一部分，但按规则视为文件名）
+                # 第一个参数是文件名
                 theme = "default"
                 filename = first
                 code = rest
+
+        logger.info(f"解析结果: theme={theme}, filename={filename}, code={code[:50]}...")
 
         if not code:
             yield event.plain_result("代码不能为空")
             return
 
-        # ---------- 主题配置 ----------
-        # 主题名 -> (模板文件名, Pygments样式名, 基础文字颜色)
-        # 可用样式名可通过 `from pygments.styles import get_all_styles; print(list(get_all_styles()))` 查看
-        THEME_CONFIG = {
-            "default": ("monokai", "#f0e6d0"),
-            "summer":  ("friendly", "#111111"),
-            "cyberpunk": ("monokai", "#00ffff"),
-            "night": ("monokai", "#e6e0c0"),
-            # 你可以继续添加更多主题
-        }
-
-        # 如果主题不存在，回退到 default
-        # 如果主题不存在，回退到 default
-        if theme not in THEME_CONFIG:
-            theme = "default"
-            
-        # 检查主题模板是否真的存在
+        # 检查主题模板是否存在
+        logger.info(f"self.templates 的键: {list(self.templates.keys())}")
         if theme not in self.templates:
             logger.warning(f"主题 '{theme}' 的模板文件不存在，回退到 default")
             theme = "default"
@@ -288,55 +311,21 @@ class CodeSnapPlugin(Star):
                 yield event.plain_result("❌ 默认主题模板不存在，请检查插件安装")
                 return
 
-        pygments_style, base_color = THEME_CONFIG[theme]
+        # 获取样式配置
+        if theme in self.THEME_STYLES:
+            pygments_style, base_color = self.THEME_STYLES[theme]
+        else:
+            pygments_style, base_color = self.DEFAULT_STYLE
+            logger.info(f"主题 '{theme}' 使用默认样式")
 
-        # 代码高亮处理
-        try:
-            if filename.endswith('.py'):
-                lexer = get_lexer_by_name('python', stripall=True)
-            elif filename.endswith(('.cpp', '.c')):
-                lexer = get_lexer_by_name('cpp', stripall=True)
-            elif filename.endswith('.java'):
-                lexer = get_lexer_by_name('java', stripall=True)
-            elif filename.endswith('.js'):
-                lexer = get_lexer_by_name('javascript', stripall=True)
-            elif filename.endswith('.html'):
-                lexer = get_lexer_by_name('html', stripall=True)
-            elif filename.endswith('.css'):
-                lexer = get_lexer_by_name('css', stripall=True)
-            else:
-                lexer = guess_lexer(code)
+        # 代码高亮
+        highlighted_code, style_defs, safe_filename = self._highlight_code(code, filename, pygments_style, base_color)
 
-            # 使用主题对应的 Pygments 样式
-            formatter = HtmlFormatter(style=pygments_style, noclasses=True, nobackground=True)
-            highlighted_code = highlight(code, lexer, formatter)
-
-            # 注入基础文字颜色 CSS 变量
-            style_defs = f"""
-            :root {{
-                --text-color: {base_color};
-            }}
-            """
-            safe_filename = html.escape(filename)
-
-        except Exception as e:
-            logger.warning(f"高亮失败，使用纯文本: {e}")
-            safe_code = html.escape(code)
-            highlighted_code = f'<pre>{safe_code}</pre>'
-            style_defs = f"""
-            :root {{
-                --text-color: {base_color};
-            }}
-            """
-            safe_filename = html.escape(filename)
-
-        # 获取主题模板（使用 template_name）
+        # 渲染 HTML
         template = self.templates[theme]
-
-        # 替换占位符
         html_content = template.replace('{{ highlighted_code | safe }}', highlighted_code) \
-                               .replace('{{ filename }}', safe_filename) \
-                               .replace('{{ style_defs | safe }}', style_defs)
+                            .replace('{{ filename }}', safe_filename) \
+                            .replace('{{ style_defs | safe }}', style_defs)
 
         logger.info(f"生成图片：theme={theme}, filename={filename}, code={code[:50]}...")
         yield event.plain_result("正在生成图片...")
