@@ -47,9 +47,15 @@ DEFAULT_TEMPLATE = '''<!DOCTYPE html>
             height: 12px;
             border-radius: 50%;
         }
-        .close { background: #ff5f56; }
-        .minimize { background: #ffbd2e; }
-        .maximize { background: #27c93f; }
+        .close {
+            background: #ff5f56;
+        }
+        .minimize {
+            background: #ffbd2e;
+        }
+        .maximize {
+            background: #27c93f;
+        }
         .filename {
             color: #ffd966;
             font-size: 14px;
@@ -85,7 +91,7 @@ DEFAULT_TEMPLATE = '''<!DOCTYPE html>
 </body>
 </html>'''
 
-@register("astrbot_plugin_codesnap", "ZeraoraBot", "Codesnap插件", "v1.2.0")
+@register("astrbot_plugin_codesnap", "ZeraoraBot", "Codesnap插件", "v0.2.0")
 
 class CodeSnapPlugin(Star):
     def __init__(self, context: Context, config: dict = None):
@@ -288,29 +294,32 @@ class CodeSnapPlugin(Star):
                 --text-color: {base_color};
             }}
             """
+            safe_filename = html.escape(filename)
+
         except Exception as e:
             logger.warning(f"高亮失败，使用纯文本: {e}")
             safe_code = html.escape(code)
-            highlighted_code = f'<pre>{code}</pre>'
+            highlighted_code = f'<pre>{safe_code}</pre>'
             style_defs = f"""
             :root {{
                 --text-color: {base_color};
             }}
             """
+            safe_filename = html.escape(filename)
 
         # 获取主题模板（使用 template_name）
         template = self.templates[template_name]
 
         # 替换占位符
-        html = template.replace('{{ highlighted_code | safe }}', highlighted_code) \
-                       .replace('{{ filename }}', safe_filename) \
-                       .replace('{{ style_defs | safe }}', style_defs)
+        html_content = template.replace('{{ highlighted_code | safe }}', highlighted_code) \
+                               .replace('{{ filename }}', safe_filename) \
+                               .replace('{{ style_defs | safe }}', style_defs)
 
         logger.info(f"生成图片：theme={theme}, filename={filename}, code={code[:50]}...")
         yield event.plain_result("正在生成图片...")
 
         try:
-            img_path = await self._render_with_playwright(html, scale_factor=2)
+            img_path = await self._render_with_playwright(html_content, scale_factor=2)
             yield event.image_result(img_path)
             asyncio.create_task(self._delayed_cleanup(img_path))
         except Exception as e:
