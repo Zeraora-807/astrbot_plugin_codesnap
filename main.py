@@ -105,18 +105,30 @@ class CodeSnapPlugin(Star):
 
     def _load_templates(self):
         """从templates目录加载所有html文件作为主题"""
+        # 源码目录（插件自带的模板）
+        src_template_dir = Path(__file__).parent / "templates"
+        # 数据目录（用户可修改的模板）
         data_dir = StarTools.get_data_dir("astrbot_plugin_codesnap")
         template_dir = data_dir / "templates"
         
+        # 如果数据目录不存在，创建它
         if not template_dir.exists():
             template_dir.mkdir(parents=True, exist_ok=True)
-            # 创建默认主题文件，方便用户修改
-            default_file = template_dir / "default.html"
-            if not default_file.exists():
-                default_file.write_text(DEFAULT_TEMPLATE, encoding="utf-8")
-                logger.info("未检测到主题模板，已创建默认主题模板 templates/default.html")
-
-        # 遍历所有 .html 文件
+            
+            # 如果源码模板目录存在，复制所有内置主题
+            if src_template_dir.exists():
+                import shutil
+                for file in src_template_dir.glob("*.html"):
+                    shutil.copy2(file, template_dir / file.name)
+                    logger.info(f"复制内置主题: {file.name}")
+            else:
+                # 没有源码模板，创建默认模板
+                default_file = template_dir / "default.html"
+                if not default_file.exists():
+                    default_file.write_text(DEFAULT_TEMPLATE, encoding="utf-8")
+                    logger.info("创建默认主题模板")
+        
+        # 加载数据目录中的所有模板
         for file in template_dir.glob("*.html"):
             theme_name = file.stem.lower()
             try:
@@ -124,12 +136,12 @@ class CodeSnapPlugin(Star):
                 logger.info(f"加载主题: {theme_name}")
             except Exception as e:
                 logger.error(f"加载主题 {file} 失败: {e}")
-
+        
         # 确保至少有一个主题可用
         if not self.templates:
             logger.warning("没有找到任何主题，使用内置默认模板")
             self.templates["default"] = DEFAULT_TEMPLATE
-
+        
         logger.info(f"共加载 {len(self.templates)} 个主题: {list(self.templates.keys())}")
 
     async def _get_browser(self) -> Browser:
@@ -199,6 +211,7 @@ class CodeSnapPlugin(Star):
 
     @snap.command("code")
     async def snap_code(self, event: AstrMessageEvent):
+        logger.info(f"当前可用主题: {list(self.templates.keys())}")
         """
         把代码转换成美观的图片（手动解析参数，支持多行代码）
         用法: /snap code [主题] [文件名] 代码
@@ -255,17 +268,27 @@ class CodeSnapPlugin(Star):
         # 主题名 -> (模板文件名, Pygments样式名, 基础文字颜色)
         # 可用样式名可通过 `from pygments.styles import get_all_styles; print(list(get_all_styles()))` 查看
         THEME_CONFIG = {
-            "default": ("default", "monokai", "#f0e6d0"),
-            "summer":  ("summer",  "friendly", "#111111"),
-            "cyberpunk": ("cyberpunk", "monokai", "#00ffff"),
-            "night": ("night", "monokai", "#e6e0c0"),
+            "default": ("monokai", "#f0e6d0"),
+            "summer":  ("friendly", "#111111"),
+            "cyberpunk": ("monokai", "#00ffff"),
+            "night": ("monokai", "#e6e0c0"),
             # 你可以继续添加更多主题
         }
 
         # 如果主题不存在，回退到 default
+        # 如果主题不存在，回退到 default
         if theme not in THEME_CONFIG:
             theme = "default"
-        template_name, pygments_style, base_color = THEME_CONFIG[theme]
+            
+        # 检查主题模板是否真的存在
+        if theme not in self.templates:
+            logger.warning(f"主题 '{theme}' 的模板文件不存在，回退到 default")
+            theme = "default"
+            if theme not in self.templates:
+                yield event.plain_result("❌ 默认主题模板不存在，请检查插件安装")
+                return
+
+        pygments_style, base_color = THEME_CONFIG[theme]
 
         # 代码高亮处理
         try:
@@ -308,7 +331,7 @@ class CodeSnapPlugin(Star):
             safe_filename = html.escape(filename)
 
         # 获取主题模板（使用 template_name）
-        template = self.templates[template_name]
+        template = self.templates[theme]
 
         # 替换占位符
         html_content = template.replace('{{ highlighted_code | safe }}', highlighted_code) \
