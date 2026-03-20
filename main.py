@@ -1,8 +1,9 @@
 import asyncio
 import tempfile
+import html
 from pathlib import Path
 from astrbot.api.event import filter, AstrMessageEvent
-from astrbot.api.star import Context, Star, register
+from astrbot.api.star import Context, Star, register, StarTools
 from astrbot.api import logger
 from playwright.async_api import async_playwright, Browser
 from pygments import highlight
@@ -10,7 +11,10 @@ from pygments.lexers import get_lexer_by_name, guess_lexer
 from pygments.formatters import HtmlFormatter
 from pygments.styles import get_style_by_name
 
-# 默认模板内容（当 templates 目录为空时使用）
+DEFAULT_PYGMENTS_STYLE = "monokai"
+DEFAULT_BASE_COLOR = "#f0e6d0"
+
+# 当templates目录为空的时候使用该内置模板
 DEFAULT_TEMPLATE = '''<!DOCTYPE html>
 <html>
 <head>
@@ -82,6 +86,7 @@ DEFAULT_TEMPLATE = '''<!DOCTYPE html>
 </html>'''
 
 @register("astrbot_plugin_codesnap", "ZeraoraBot", "Codesnap插件", "v1.2.0")
+
 class CodeSnapPlugin(Star):
     def __init__(self, context: Context, config: dict = None):
         super().__init__(context)
@@ -93,10 +98,12 @@ class CodeSnapPlugin(Star):
         self._load_templates()
 
     def _load_templates(self):
-        """从 templates 目录加载所有 .html 文件作为主题"""
-        template_dir = Path(__file__).parent / "templates"
+        """从templates目录加载所有html文件作为主题"""
+        data_dir = StarTools.get_data_dir("astrbot_plugin_codesnap")
+        template_dir = data_dir / "templates"
+        
         if not template_dir.exists():
-            template_dir.mkdir(exist_ok=True)
+            template_dir.mkdir(parents=True, exist_ok=True)
             # 创建默认主题文件，方便用户修改
             default_file = template_dir / "default.html"
             if not default_file.exists():
@@ -191,7 +198,7 @@ class CodeSnapPlugin(Star):
             await page.close()
 
     @filter.command_group("snap")
-    def snap(self):
+    def snap(self, event: AstrMessageEvent):
         pass
 
     @snap.command("code")
@@ -208,9 +215,9 @@ class CodeSnapPlugin(Star):
         text = event.message_str.strip()
         # 去掉命令前缀 "/snap code" 或 "snap code"
         if text.startswith("/snap code"):
-            content = text[10:].lstrip()
+            content = text[10:]
         elif text.startswith("snap code"):
-            content = text[9:].lstrip()
+            content = text[9:]
         else:
             content = text
 
@@ -293,6 +300,7 @@ class CodeSnapPlugin(Star):
             """
         except Exception as e:
             logger.warning(f"高亮失败，使用纯文本: {e}")
+            safe_code = html.escape(code)
             highlighted_code = f'<pre>{code}</pre>'
             style_defs = f"""
             :root {{
@@ -305,7 +313,7 @@ class CodeSnapPlugin(Star):
 
         # 替换占位符
         html = template.replace('{{ highlighted_code | safe }}', highlighted_code) \
-                       .replace('{{ filename }}', filename) \
+                       .replace('{{ filename }}', safe_filename) \
                        .replace('{{ style_defs | safe }}', style_defs)
 
         logger.info(f"生成图片：theme={theme}, filename={filename}, code={code[:50]}...")
